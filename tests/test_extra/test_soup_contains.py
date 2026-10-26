@@ -1,6 +1,8 @@
 """Test contains selectors."""
 from .. import util
 import warnings
+import signal
+import pytest
 import soupsieve as sv
 
 
@@ -307,3 +309,26 @@ class TestSoupContains(util.TestCase):
             # Verify some things
             self.assertTrue(len(w) == 1)
             self.assertTrue(issubclass(w[-1].category, FutureWarning))
+
+    @pytest.mark.skipif(not hasattr(signal, 'SIGALRM'), reason='test requires signal.SIGALRM')
+    def test_contains_unclosed_quote(self):
+        """Test contains with a quoted value that never closes fails for syntax error, not timeout error."""
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(3)
+
+        passed = False
+        try:
+            with self.assertRaises(sv.SelectorSyntaxError):
+                sv.compile(':-soup-contains("' + ('x' * 300))
+            with self.assertRaises(sv.SelectorSyntaxError):
+                sv.compile(":-soup-contains-own('" + ('x' * 300))
+            passed = True
+        except TimeoutError:
+            pass
+        finally:
+            signal.alarm(0)
+        self.assertTrue(passed)

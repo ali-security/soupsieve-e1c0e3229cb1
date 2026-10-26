@@ -1,5 +1,8 @@
 """Test language selectors."""
 from .. import util
+import signal
+import pytest
+import soupsieve as sv
 
 
 class TestLang(util.TestCase):
@@ -401,3 +404,26 @@ class TestLang(util.TestCase):
             [],
             flags=util.XHTML
         )
+
+    @pytest.mark.skipif(not hasattr(signal, 'SIGALRM'), reason='test requires signal.SIGALRM')
+    def test_lang_unclosed_quote(self):
+        """Test language with a quoted value that never closes fails for syntax error, not timeout error."""
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(3)
+
+        passed = False
+        try:
+            with self.assertRaises(sv.SelectorSyntaxError):
+                sv.compile(':lang("' + ('x' * 300))
+            with self.assertRaises(sv.SelectorSyntaxError):
+                sv.compile(":lang(de, '" + ('x' * 300))
+            passed = True
+        except TimeoutError:
+            pass
+        finally:
+            signal.alarm(0)
+        self.assertTrue(passed)

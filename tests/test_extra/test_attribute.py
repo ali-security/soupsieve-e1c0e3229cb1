@@ -1,5 +1,8 @@
 """Test attribute selectors."""
 from .. import util
+import soupsieve as sv
+import signal
+import pytest
 
 
 class TestAttribute(util.TestCase):
@@ -50,3 +53,45 @@ class TestAttribute(util.TestCase):
             ["div", "0", "1", "2", "3", "pre", "4", "6"],
             flags=util.HTML5
         )
+
+    @pytest.mark.skipif(not hasattr(signal, 'SIGALRM'), reason='test requires signal.SIGALRM')
+    def test_bad_attribute_unclused(self):
+        """Test bad attribute fails for syntax error, not timeout error."""
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(3)
+
+        passed = False
+        try:
+            with self.assertRaises(sv.SelectorSyntaxError):
+                sv.compile('[a="' + ('x' * 300))
+            passed = True
+        except TimeoutError:
+            pass
+        finally:
+            signal.alarm(0)
+        self.assertTrue(passed)
+
+    @pytest.mark.skipif(not hasattr(signal, 'SIGALRM'), reason='test requires signal.SIGALRM')
+    def test_bad_attribute_unclosed_single_quote(self):
+        """Test bad attribute with single quotes fails for syntax error, not timeout error."""
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(3)
+
+        passed = False
+        try:
+            with self.assertRaises(sv.SelectorSyntaxError):
+                sv.compile("[a='" + ('x' * 300))
+            passed = True
+        except TimeoutError:
+            pass
+        finally:
+            signal.alarm(0)
+        self.assertTrue(passed)
